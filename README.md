@@ -2,6 +2,15 @@
 
 AstrBot 插件：读取本机 WeChatDataAnalysis 的群聊数据，筛选真正的 `@所有人` 通知，自动去重保存，再在私聊中查询原文或 AI 要点列表。
 
+## 采集工具下载
+
+本插件需要配合 WeChatDataAnalysis 运行：
+
+- GitHub 项目：[LifeArchiveProject/WeChatDataAnalysis](https://github.com/LifeArchiveProject/WeChatDataAnalysis)
+- 安装包下载：[Releases](https://github.com/LifeArchiveProject/WeChatDataAnalysis/releases/latest)
+
+先按该项目说明安装并加载微信账号，确认实时读取正常，再使用本插件。使用期间需保持采集工具运行。
+
 ## 使用
 
 1. 保持电脑微信、WeChatDataAnalysis 和 AstrBot 运行。确认数据分析工具已完成账号加载、实时读取正常，本地接口默认是 `http://127.0.0.1:10392`。
