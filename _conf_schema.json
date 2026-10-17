@@ -1,0 +1,55 @@
+{
+  "api_url": {
+    "description": "WeChatDataAnalysis 本地接口",
+    "type": "string",
+    "default": "http://127.0.0.1:10392",
+    "hint": "仅允许本机 HTTP 地址；需要保持数据分析工具运行。"
+  },
+  "account": {
+    "description": "微信账号标识",
+    "type": "string",
+    "default": "",
+    "hint": "留空则首次绑定数据工具默认账号，之后保持绑定，避免混合账号。"
+  },
+  "group_ids": {
+    "description": "需要采集的群 ID",
+    "type": "list",
+    "default": [],
+    "hint": "留空表示本地服务可读取的全部群；填写时使用以 @chatroom 结尾的群 ID。"
+  },
+  "poll_seconds": {
+    "description": "自动采集间隔（秒）",
+    "type": "int",
+    "default": 60,
+    "hint": "最小 30 秒。"
+  },
+  "pages_per_group": {
+    "description": "每轮每群最多读取页数",
+    "type": "int",
+    "default": 10,
+    "hint": "每页 100 条，超出部分自动留待后续继续读取，最多 100 页。"
+  },
+  "max_notices": {
+    "description": "单次汇总最多纳入通知数",
+    "type": "int",
+    "default": 40,
+    "hint": "最多100条；手动汇总和定时早报调用模型，自动采集不调用。超出本次早报的通知留待次日。"
+  },
+  "daily_report_enabled": {
+    "description": "开启每日私聊汇报",
+    "type": "bool",
+    "default": false
+  },
+  "daily_report_time": {
+    "description": "北京时间汇报时间",
+    "type": "string",
+    "default": "07:00",
+    "hint": "24小时制 HH:MM。"
+  },
+  "daily_report_target": {
+    "description": "接收早报的私聊 UMO",
+    "type": "string",
+    "default": "",
+    "hint": "私聊发送 /sid 获取完整 UMO；必须是 FriendMessage。"
+  }
+}
