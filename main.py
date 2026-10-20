@@ -394,6 +394,7 @@ class WeChatNoticeDigest(Star):
                 "ready": "初始化完成",
                 "error": "不可用",
                 "cancelled": "已取消",
+                "offline": "微信未登录所绑定账号或权限不一致",
             }
             text += f"\n内置读取：{names.get(state.get('state'), '未知')}\n{state.get('error', '')}"
         if self.reporter:
