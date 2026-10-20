@@ -1,0 +1,15 @@
+{
+  "project": "https://github.com/freanocank/wechat-decrypt",
+  "commit": "f0b3f9f95dda2d954ee3dbe1d139fb1944a5ecfd",
+  "license": "MIT",
+  "files": {
+    "scripts/common/wal_snapshot.py": "efb021e64e4b561bd6f860faa69fffbd52d4851713389895d854776af342a72d",
+    "scripts/windows/extract_raw_key.py": "08d4e1e0b80276f0652fc73cd9fcff1241bd67e1c57a261f54990bf3996ed1d4",
+    "scripts/windows/decrypt_all.py": "ed52fe3593663509c3daac040e14c5d91c0b6c6e3af2f3b9030fbe70954a06a6",
+    "LICENSE": "8ce1f596be018484e59315ae37c8fb397d4fddb05b2f6793af538f54c8e1a6ce"
+  },
+  "adaptations": {
+    "capture.js": "JS literal only; no process termination or CLI behavior",
+    "builtin/snapshot.py": "SQLCipher page authentication/decryption adapted from decrypt_all.py"
+  }
+}
