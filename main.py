@@ -11,6 +11,7 @@ from astrbot.api.event import AstrMessageEvent, MessageChain, filter
 from astrbot.api.star import Context, Star, StarTools
 from astrbot.core.star.filter.command import GreedyStr
 
+from .builtin.messages import logical_account
 from .builtin.source import BuiltinNoticeSource
 from .collector import Collector, NoticeStore
 from .presentation import parse_items, render_items
@@ -92,7 +93,9 @@ class WeChatNoticeDigest(Star):
             self.collector = Collector(
                 self.store,
                 self.config.get("api_url", "http://127.0.0.1:10392"),
-                account=self.config.get("account", ""),
+                account=getattr(
+                    source, "account", logical_account(str(self.config.get("account", "")))
+                ),
                 group_ids=self.config.get("group_ids", []),
                 page_size=100,
                 max_pages=self.config.get("pages_per_group", 10),

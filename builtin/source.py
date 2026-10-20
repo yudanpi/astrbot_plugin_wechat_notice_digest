@@ -7,6 +7,8 @@ import sys
 import time
 from pathlib import Path
 
+from .messages import logical_account
+
 MAX_LINE = 8 * 1024 * 1024
 
 
@@ -20,7 +22,8 @@ class BuiltinNoticeSource:
     mode = "builtin"
 
     def __init__(self, data_dir: Path, storage: Path, account: str):
-        self.data_dir, self.storage, self.account = data_dir, storage, account
+        self.data_dir, self.storage, self.storage_account = data_dir, storage, account
+        self.account = logical_account(account)
         self.process = None
         self.lock = asyncio.Lock()
         self.sequence, self.failures = 0, 0
@@ -53,7 +56,7 @@ class BuiltinNoticeSource:
         config = {
             "data_dir": str(self.data_dir),
             "storage": str(self.storage),
-            "account": self.account,
+            "account": self.storage_account,
         }
         self.process.stdin.write((json.dumps(config) + "\n").encode())
         await self.process.stdin.drain()

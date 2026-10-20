@@ -9,6 +9,12 @@ from pathlib import Path
 MAX_TEXT = 1024 * 1024
 
 
+def logical_account(account):
+    """A four-character device directory suffix is not a different WeChat user."""
+    match = re.fullmatch(r"(wxid_[A-Za-z0-9]+)_[A-Za-z0-9]{4}", account)
+    return match.group(1) if match else account
+
+
 def decode_text(value):
     """Decode bounded UTF-8/Zstandard fields."""
     if value is None:

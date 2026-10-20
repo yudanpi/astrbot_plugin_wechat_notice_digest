@@ -11,7 +11,13 @@ from pathlib import Path
 from .bootstrap import BootstrapController
 from .credentials import CredentialStore
 from .liveness import LiveAccountGuard
-from .messages import LocalMessageReader, list_groups, normalize_record, read_messages
+from .messages import (
+    LocalMessageReader,
+    list_groups,
+    logical_account,
+    normalize_record,
+    read_messages,
+)
 from .snapshot import SnapshotChangedError, decrypt_snapshot, read_snapshot
 
 
@@ -30,7 +36,8 @@ class ReaderRuntime:
     """Use at most two in-memory database connections; never write plaintext files."""
 
     def __init__(self, data_dir, storage, account, *, live_check=None):
-        self.account, self.storage = account, Path(storage).resolve()
+        self.storage_account, self.storage = account, Path(storage).resolve()
+        self.account = logical_account(account)
         self.reader = LocalMessageReader(account, self.storage)
         binding = hashlib.sha256((account + "\0" + str(self.storage)).encode()).hexdigest()[:24]
         self.credentials = CredentialStore(Path(data_dir) / "builtin" / binding)
@@ -69,7 +76,7 @@ class ReaderRuntime:
         state = self.bootstrap.status()
         if state["state"] == "idle" and self.credentials.path.exists():
             try:
-                self.credentials.load(self.account)
+                self.credentials.load(self.storage_account)
                 state = {"state": "ready", "error": ""}
             except RuntimeError:
                 state = {"state": "error", "error": "读取凭据不可用，请在本机重新初始化"}
@@ -92,7 +99,7 @@ class ReaderRuntime:
             raise RuntimeError("Selected WeChat account is not live")
         if self.status()["state"] != "ready":
             raise RuntimeError("Reader not initialized")
-        self.key = self.credentials.load(self.account)
+        self.key = self.credentials.load(self.storage_account)
         path = params.pop("path")
         base = {"status": "success", "account": self.account, "source": "realtime"}
         if path == "/api/chat/accounts":
