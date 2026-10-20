@@ -1,1 +1,4 @@
 aiohttp>=3.9,<4
+pycryptodome==3.24.1; sys_platform == "win32"
+zstandard==0.25.0; sys_platform == "win32"
+frida==17.24.3; sys_platform == "win32"

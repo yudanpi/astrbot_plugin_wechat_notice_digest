@@ -106,6 +106,22 @@ class NoticeStore:
                     ),
                 )
 
+    def switch_source(self, mode, now):
+        """Keep business data; discard transport-specific pagination on a switch."""
+        state = self.get_state("__source")
+        previous = state.get("mode", "external")
+        if previous != mode:
+            with self.db:
+                self.db.execute("DELETE FROM staging")
+                self.db.execute(
+                    "DELETE FROM states WHERE group_id IN (SELECT group_id FROM group_catalog)"
+                )
+            state = {"mode": mode, "minimum_timestamp": now}
+        elif not state:
+            state = {"mode": mode, "minimum_timestamp": 0}
+        self.set_state("__source", state)
+        return int(state.get("minimum_timestamp", 0))
+
     def query(self, start, end, limit=500, *, unreported_to=None):
         rows = self.db.execute(
             """SELECT number,group_id,group_name,payload FROM notices
@@ -239,6 +255,7 @@ class Collector:
         retention_days=30,
         clock=time.time,
         source=None,
+        minimum_timestamp=0,
     ):
         self.source = source if source is not None else HttpNoticeSource(base_url)
         self.store, self.base_url = store, getattr(self.source, "base_url", "")
@@ -249,6 +266,7 @@ class Collector:
         self.session_limit = max(1, min(int(session_limit), 2000))
         self.retention_days = max(1, min(int(retention_days), 30))
         self.clock = clock
+        self.minimum_timestamp = int(minimum_timestamp)
         self.lock = asyncio.Lock()
         self.info = {
             "connected": False,
@@ -385,7 +403,7 @@ class Collector:
                 notices = [
                     n
                     for n in extract_notices(self.store.staged(gid), now)
-                    if n["createTime"] >= state["floor"]
+                    if n["createTime"] >= max(state["floor"], self.minimum_timestamp)
                 ]
                 self.store.save_notices(gid, str(group.get("name") or gid), notices)
                 self.store.set_state(gid, {"cursor": state["started"], "active": False})

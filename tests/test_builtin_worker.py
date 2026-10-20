@@ -19,7 +19,7 @@ class WorkerTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_no_process_before_first_request_and_no_implicit_initialization(self):
         with tempfile.TemporaryDirectory() as directory:
-            source = BuiltinNoticeSource(Path(directory), Path(directory)/"a/db_storage", "a")
+            source = BuiltinNoticeSource(Path(directory), Path(directory) / "a/db_storage", "a")
             self.assertIsNone(source.process)
             state = await source.status()
             self.assertEqual(state["state"], "idle")
@@ -30,13 +30,16 @@ class WorkerTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_protocol_errors_cancel_worker_and_enter_bounded_backoff(self):
         with tempfile.TemporaryDirectory() as directory:
-            source = BuiltinNoticeSource(Path(directory), Path(directory)/"a/db_storage", "a")
+            source = BuiltinNoticeSource(Path(directory), Path(directory) / "a/db_storage", "a")
+
             class Fake:
                 returncode = None
                 stdin = None
                 stdout = None
+
             async def bad(*args, **kwargs):
                 raise RuntimeError("Malformed protocol")
+
             with patch.object(source, "_request", side_effect=bad):
                 with self.assertRaises(RuntimeError):
                     await source.get("/api/chat/accounts")

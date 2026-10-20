@@ -46,14 +46,18 @@ def decrypt_snapshot(data: bytes, raw_key: bytes) -> bytes:
     key = hashlib.pbkdf2_hmac("sha512", raw_key, salt, 256000, 32)
     mac_key = hashlib.pbkdf2_hmac("sha512", key, bytes(b ^ 0x3A for b in salt), 2, 32)
     for start in range(0, len(data), 4096):
-        page = data[start:start + 4096]
+        page = data[start : start + 4096]
         offset = 16 if start == 0 else 0
-        digest = hmac.new(mac_key, page[offset:-64] + struct.pack("<I", start // 4096 + 1), hashlib.sha512).digest()
+        digest = hmac.new(
+            mac_key, page[offset:-64] + struct.pack("<I", start // 4096 + 1), hashlib.sha512
+        ).digest()
         if not hmac.compare_digest(digest, page[-64:]):
-            raise SnapshotIntegrityError("Database authentication failed; initialize the selected account")
+            raise SnapshotIntegrityError(
+                "Database authentication failed; initialize the selected account"
+            )
     output = bytearray()
     for start in range(0, len(data), 4096):
-        page = data[start:start + 4096]
+        page = data[start : start + 4096]
         offset = 16 if start == 0 else 0
         plain = AES.new(key, AES.MODE_CBC, page[4016:4032]).decrypt(page[offset:4016])
         if start == 0:

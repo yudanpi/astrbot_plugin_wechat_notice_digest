@@ -1,4 +1,26 @@
 {
+  "source_mode": {
+    "description": "数据读取方式",
+    "type": "string",
+    "default": "external",
+    "options": [
+      "external",
+      "builtin"
+    ],
+    "hint": "builtin：插件内置读取；external：兼容原采集工具。切换后只采集切换时间以后的新通知，旧记录保留。"
+  },
+  "wechat_storage_dir": {
+    "description": "微信账号 db_storage 完整路径",
+    "type": "string",
+    "default": "",
+    "hint": "Windows本机路径，例如 D:\\xwechat_files\\账号目录名\\db_storage；账号标识填写其上一级目录名。"
+  },
+  "reader_initialize": {
+    "description": "开始本机读取初始化（一次性）",
+    "type": "bool",
+    "default": false,
+    "hint": "选择builtin并填写路径/账号后开启并重载；然后120秒内手动退出、打开微信并登录。插件不会结束微信。"
+  },
   "api_url": {
     "description": "WeChatDataAnalysis 本地接口",
     "type": "string",
@@ -9,7 +31,7 @@
     "description": "微信账号标识",
     "type": "string",
     "default": "",
-    "hint": "留空则首次绑定数据工具默认账号，之后保持绑定，避免混合账号。"
+    "hint": "内置读取：填写 db_storage 的上一级账号目录名，必须显式指定；external：留空则绑定采集工具默认账号。"
   },
   "group_ids": {
     "description": "需要采集的群 ID",

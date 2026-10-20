@@ -16,6 +16,7 @@ def decode_text(value):
     if isinstance(value, bytes):
         if value.startswith(b"\x28\xb5\x2f\xfd"):
             import zstandard
+
             value = zstandard.ZstdDecompressor().decompress(value, max_output_size=MAX_TEXT)
         if len(value) > MAX_TEXT:
             raise ValueError("Message field exceeds supported size")
@@ -33,7 +34,7 @@ def normalize_record(row: dict, *, account: str, shard: str, table: str) -> dict
         content = decode_text(row["compress_content"])
     sender = str(row.get("sender_username") or "")
     if sender and content.startswith(sender + ":\n"):
-        content = content[len(sender) + 2:]
+        content = content[len(sender) + 2 :]
     mentions = []
     source = decode_text(row.get("source"))
     if source:
@@ -51,10 +52,17 @@ def normalize_record(row: dict, *, account: str, shard: str, table: str) -> dict
     else:
         if not row.get("local_id"):
             raise ValueError("Message lacks stable identity")
-        identity = "local:" + hashlib.sha256(f"{account}\0{shard}\0{table}\0{row['local_id']}".encode()).hexdigest()
-    return {"id": identity, "createTime": int(row.get("create_time") or 0),
-            "content": content or "[非文本消息]", "senderUsername": sender,
-            "atUsernames": list(dict.fromkeys(mentions))}
+        identity = (
+            "local:"
+            + hashlib.sha256(f"{account}\0{shard}\0{table}\0{row['local_id']}".encode()).hexdigest()
+        )
+    return {
+        "id": identity,
+        "createTime": int(row.get("create_time") or 0),
+        "content": content or "[非文本消息]",
+        "senderUsername": sender,
+        "atUsernames": list(dict.fromkeys(mentions)),
+    }
 
 
 def list_groups(connection: sqlite3.Connection) -> list[dict]:
@@ -62,8 +70,13 @@ def list_groups(connection: sqlite3.Connection) -> list[dict]:
     columns = {row[1] for row in connection.execute('PRAGMA table_info("contact")')}
     if not {"username", "nick_name", "remark"}.issubset(columns):
         raise ValueError("Unsupported contact schema")
-    rows = connection.execute("SELECT username,nick_name,remark FROM contact WHERE username LIKE ? ORDER BY username", ("%@chatroom",))
-    return [{"username": row[0], "name": row[2] or row[1] or row[0], "isGroup": True} for row in rows]
+    rows = connection.execute(
+        "SELECT username,nick_name,remark FROM contact WHERE username LIKE ? ORDER BY username",
+        ("%@chatroom",),
+    )
+    return [
+        {"username": row[0], "name": row[2] or row[1] or row[0], "isGroup": True} for row in rows
+    ]
 
 
 def read_messages(connection: sqlite3.Connection, group_id: str, limit: int, offset: int) -> dict:
@@ -76,13 +89,22 @@ def read_messages(connection: sqlite3.Connection, group_id: str, limit: int, off
     columns = {row[1] for row in connection.execute(f'PRAGMA table_info("{table}")')}
     if not columns:
         return {"messages": [], "hasMore": False}
-    if not {"local_id", "server_id", "create_time", "message_content", "real_sender_id", "source"}.issubset(columns):
+    if not {
+        "local_id",
+        "server_id",
+        "create_time",
+        "message_content",
+        "real_sender_id",
+        "source",
+    }.issubset(columns):
         raise ValueError("Unsupported message schema: structured source required")
     extra = ",m.compress_content" if "compress_content" in columns else ""
     cursor = connection.execute(
-        f'SELECT m.local_id,m.server_id,m.create_time,m.message_content,m.source,n.user_name AS sender_username{extra} '
+        f"SELECT m.local_id,m.server_id,m.create_time,m.message_content,m.source,n.user_name AS sender_username{extra} "
         f'FROM "{table}" m LEFT JOIN Name2Id n ON n.rowid=m.real_sender_id '
-        'ORDER BY m.create_time DESC,m.local_id DESC LIMIT ? OFFSET ?', (limit + 1, offset))
+        "ORDER BY m.create_time DESC,m.local_id DESC LIMIT ? OFFSET ?",
+        (limit + 1, offset),
+    )
     names = [column[0] for column in cursor.description]
     rows = [dict(zip(names, row)) for row in cursor]
     return {"messages": rows[:limit], "hasMore": len(rows) > limit, "table": table}

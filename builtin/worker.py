@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+import re
 import sqlite3
 import sys
 from collections import OrderedDict
@@ -98,20 +99,36 @@ class ReaderRuntime:
             limit, offset = int(params.get("limit", 100)), int(params.get("offset", 0))
             if not 1 <= limit <= 500 or not 0 <= offset <= 100000:
                 raise ValueError("Unsupported page bounds")
-            shards = sorted((self.storage / "message").glob("message_[0-9]*.db"))
+            shards = sorted(
+                path
+                for path in (self.storage / "message").glob("message_*.db")
+                if re.fullmatch(r"message_\d+\.db", path.name)
+            )
             if not shards:
                 raise RuntimeError("Message shards unavailable")
             rows = []
             for shard in shards:
-                response = read_messages(self.connection(shard), group, min(offset + limit + 1, 200000), 0)
+                response = read_messages(
+                    self.connection(shard), group, min(offset + limit + 1, 200000), 0
+                )
                 for row in response["messages"]:
-                    item = normalize_record(row, account=self.account, shard=shard.name, table=response["table"])
+                    item = normalize_record(
+                        row, account=self.account, shard=shard.name, table=response["table"]
+                    )
                     item["_local_id"] = int(row["local_id"])
                     rows.append(item)
-            rows.sort(key=lambda row: (row["createTime"], row["_local_id"], row["id"]), reverse=True)
+            rows.sort(
+                key=lambda row: (row["createTime"], row["_local_id"], row["id"]), reverse=True
+            )
             unique = list({row["id"]: row for row in reversed(rows)}.values())
-            unique.sort(key=lambda row: (row["createTime"], row["_local_id"], row["id"]), reverse=True)
-            return {**base, "messages": unique[offset:offset + limit], "hasMore": len(unique) > offset + limit}
+            unique.sort(
+                key=lambda row: (row["createTime"], row["_local_id"], row["id"]), reverse=True
+            )
+            return {
+                **base,
+                "messages": unique[offset : offset + limit],
+                "hasMore": len(unique) > offset + limit,
+            }
         raise ValueError("Unsupported reader resource")
 
     def close(self):
@@ -138,10 +155,16 @@ def main():
                 result = runtime.dispatch(request["method"], request.get("params", {}))
                 response = {"id": request_id, "result": result}
             except Exception as error:
-                response = {"id": request_id, "error": type(error).__name__ + ": reader operation failed; check initialization, login and schema"}
+                response = {
+                    "id": request_id,
+                    "error": type(error).__name__
+                    + ": reader operation failed; check initialization, login and schema",
+                }
             encoded = json.dumps(response, ensure_ascii=False).encode()
             if len(encoded) >= 8 * 1024 * 1024:
-                encoded = json.dumps({"id": request_id, "error": "Reader response exceeds limit"}).encode()
+                encoded = json.dumps(
+                    {"id": request_id, "error": "Reader response exceeds limit"}
+                ).encode()
             sys.stdout.buffer.write(encoded + b"\n")
             sys.stdout.buffer.flush()
     finally:

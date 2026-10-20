@@ -21,17 +21,17 @@ def sqlite_bytes(sql="CREATE TABLE sample(value TEXT); INSERT INTO sample VALUES
     for start in range(0, len(raw), PAGE):
         header = start + (100 if start == 0 else 0)
         assert raw[header] == 13, "Fixture only supports small leaf pages"
-        cells = int.from_bytes(raw[header + 3:header + 5], "big")
-        content = int.from_bytes(raw[header + 5:header + 7], "big")
+        cells = int.from_bytes(raw[header + 3 : header + 5], "big")
+        content = int.from_bytes(raw[header + 5 : header + 7], "big")
         assert content > (header - start) + 8 + cells * 2 + 80
-        payload = bytes(raw[start + content:start + PAGE])
-        raw[start + content - 80:start + PAGE - 80] = payload
-        raw[start + PAGE - 80:start + PAGE] = b"\0" * 80
-        raw[header + 5:header + 7] = (content - 80).to_bytes(2, "big")
+        payload = bytes(raw[start + content : start + PAGE])
+        raw[start + content - 80 : start + PAGE - 80] = payload
+        raw[start + PAGE - 80 : start + PAGE] = b"\0" * 80
+        raw[header + 5 : header + 7] = (content - 80).to_bytes(2, "big")
         for i in range(cells):
             offset = header + 8 + i * 2
-            pointer = int.from_bytes(raw[offset:offset + 2], "big") - 80
-            raw[offset:offset + 2] = pointer.to_bytes(2, "big")
+            pointer = int.from_bytes(raw[offset : offset + 2], "big") - 80
+            raw[offset : offset + 2] = pointer.to_bytes(2, "big")
     return bytes(raw)
 
 
@@ -43,9 +43,13 @@ def encrypt(raw, key=RAW_KEY, salt=b"fixture-salt-123"):
         number = start // PAGE + 1
         offset = 16 if number == 1 else 0
         iv = bytes([number % 255]) * 16
-        ciphertext = AES.new(cipher_key, AES.MODE_CBC, iv).encrypt(raw[start + offset:start + PAGE - 80])
+        ciphertext = AES.new(cipher_key, AES.MODE_CBC, iv).encrypt(
+            raw[start + offset : start + PAGE - 80]
+        )
         page = (salt if number == 1 else b"") + ciphertext + iv
-        digest = hmac.new(mac_key, page[offset:] + struct.pack("<I", number), hashlib.sha512).digest()
+        digest = hmac.new(
+            mac_key, page[offset:] + struct.pack("<I", number), hashlib.sha512
+        ).digest()
         output.extend(page + digest)
     return bytes(output)
 
@@ -57,6 +61,7 @@ def wal(frames):
             a = (a + x + b) & 0xFFFFFFFF
             b = (b + y + a) & 0xFFFFFFFF
         return a, b
+
     salts = b"test-sal"
     header = struct.pack(">IIII", 0x377F0682, 3007000, PAGE, 0) + salts
     state = checksum(header)
@@ -66,4 +71,3 @@ def wal(frames):
         state = checksum(prefix + page, state)
         output += prefix + salts + struct.pack(">II", *state) + page
     return output
-

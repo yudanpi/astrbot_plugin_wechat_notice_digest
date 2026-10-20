@@ -1,12 +1,11 @@
 import sys
 import tempfile
-import threading
-import time
 import unittest
 from pathlib import Path
 from unittest.mock import Mock
 
 from builtin_fixtures import RAW_KEY, encrypt, sqlite_bytes
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from astrbot_plugin_wechat_notice_digest.builtin.bootstrap import BootstrapController
 
@@ -32,9 +31,11 @@ class BootstrapTests(unittest.TestCase):
             storage = Path(directory) / "a/db_storage"
             storage.mkdir(parents=True)
             credentials = Mock()
+
             def capture(storage, cancel, timeout):
                 cancel.wait(timeout)
                 raise TimeoutError("secret-should-not-escape")
+
             controller = BootstrapController(storage, "a", credentials, capture=capture)
             controller.start(timeout=1)
             controller.cancel()
@@ -50,7 +51,9 @@ class BootstrapTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 BootstrapController(storage, "b", Mock())
             credentials = Mock()
-            controller = BootstrapController(storage, "a", credentials, capture=lambda *args: b"x" * 32)
+            controller = BootstrapController(
+                storage, "a", credentials, capture=lambda *args: b"x" * 32
+            )
             controller.start()
             controller.wait(3)
             self.assertEqual(controller.status()["state"], "error")

@@ -13,7 +13,15 @@ from .snapshot import decrypt_snapshot
 
 
 def _main_pid():
-    result = subprocess.run(["tasklist", "/FI", "IMAGENAME eq Weixin.exe", "/FO", "CSV", "/NH"], capture_output=True, text=True, errors="replace", timeout=3, check=True, creationflags=subprocess.CREATE_NO_WINDOW)
+    result = subprocess.run(
+        ["tasklist", "/FI", "IMAGENAME eq Weixin.exe", "/FO", "CSV", "/NH"],
+        capture_output=True,
+        text=True,
+        errors="replace",
+        timeout=3,
+        check=True,
+        creationflags=subprocess.CREATE_NO_WINDOW,
+    )
     processes = []
     for row in csv.reader(io.StringIO(result.stdout)):
         if len(row) >= 5 and row[0].lower() == "weixin.exe" and row[1].isdigit():
@@ -46,6 +54,7 @@ def capture_key(storage: Path, cancel: threading.Event, timeout: int) -> bytes:
     result = []
     seen = set()
     failed = threading.Event()
+
     def on_message(message, data):
         if message.get("type") == "error":
             failed.set()
@@ -64,13 +73,19 @@ def capture_key(storage: Path, cancel: threading.Event, timeout: int) -> bytes:
             except Exception:
                 return
             result.append(candidate)
+
     script = None
     try:
         js = Path(__file__).resolve().parents[1] / "vendor/wechat_decrypt/capture.js"
         script = session.create_script(js.read_text(encoding="utf-8"))
         script.on("message", on_message)
         script.load()
-        while not cancel.is_set() and time.monotonic() < deadline and not result and not failed.is_set():
+        while (
+            not cancel.is_set()
+            and time.monotonic() < deadline
+            and not result
+            and not failed.is_set()
+        ):
             cancel.wait(0.05)
         if cancel.is_set() or not result:
             raise TimeoutError("Initialization timed out or unsupported WeChat version")
@@ -125,7 +140,10 @@ class BootstrapController:
             self.state = "ready"
         except Exception as error:
             self.state = "cancelled" if self.cancelled.is_set() else "error"
-            self.error = type(error).__name__ + ": initialization failed; check login, permissions and supported version"
+            self.error = (
+                type(error).__name__
+                + ": initialization failed; check login, permissions and supported version"
+            )
 
     def cancel(self) -> None:
         self.cancelled.set()

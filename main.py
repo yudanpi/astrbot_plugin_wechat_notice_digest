@@ -11,6 +11,7 @@ from astrbot.api.event import AstrMessageEvent, MessageChain, filter
 from astrbot.api.star import Context, Star, StarTools
 from astrbot.core.star.filter.command import GreedyStr
 
+from .builtin.source import BuiltinNoticeSource
 from .collector import Collector, NoticeStore
 from .presentation import parse_items, render_items
 from .schedule import DailyReporter, ScheduledReportEvent
@@ -54,6 +55,7 @@ class WeChatNoticeDigest(Star):
         self.task = None
         self.schedule_task = None
         self.reporter = None
+        self.source_mode = config.get("source_mode", "external")
         self.digest_lock = asyncio.Lock()
         self.max_notices = max(1, min(int(config.get("max_notices", 40)), 100))
         self.interval = max(30, int(config.get("poll_seconds", 60)))
@@ -61,7 +63,32 @@ class WeChatNoticeDigest(Star):
     async def initialize(self):
         """Open persistent storage and start the single background collector."""
         self.store = NoticeStore(self.data_dir / "notices.db")
+        source = None
         try:
+            if self.source_mode not in {"external", "builtin"}:
+                raise ValueError("数据源必须为 external 或 builtin")
+            if self.source_mode == "builtin":
+                from pathlib import Path
+
+                source = BuiltinNoticeSource(
+                    self.data_dir,
+                    Path(self.config.get("wechat_storage_dir", "")).expanduser(),
+                    str(self.config.get("account", "")).strip(),
+                )
+                if self.config.get("reader_initialize") is True:
+                    self.config["reader_initialize"] = False
+                    if hasattr(self.config, "save_config"):
+                        self.config.save_config()
+                    try:
+                        await source.initialize()
+                        logger.info(
+                            "Local reader initialization requested; manually restart WeChat within 120 seconds."
+                        )
+                    except Exception:
+                        logger.warning(
+                            "Local reader initialization unavailable; check configuration and dependencies."
+                        )
+            minimum_timestamp = self.store.switch_source(self.source_mode, int(time.time()))
             self.collector = Collector(
                 self.store,
                 self.config.get("api_url", "http://127.0.0.1:10392"),
@@ -70,6 +97,8 @@ class WeChatNoticeDigest(Star):
                 page_size=100,
                 max_pages=self.config.get("pages_per_group", 10),
                 retention_days=30,
+                source=source,
+                minimum_timestamp=minimum_timestamp,
             )
             self.reporter = DailyReporter(
                 self.store, self.config, self._build_daily_report, self._send_daily_part
@@ -80,6 +109,8 @@ class WeChatNoticeDigest(Star):
                     self._run_reports(), name=PLUGIN_NAME + "_daily"
                 )
         except Exception:
+            if source:
+                await source.close()
             self.store.close()
             self.store = None
             raise
@@ -345,6 +376,7 @@ class WeChatNoticeDigest(Star):
             return
         info = self.collector.status()
         text = (
+            f"采集方式：{'插件内置读取' if self.source_mode == 'builtin' else '外部采集工具'}\n"
             f"本地接口：{'已连接' if info['connected'] else '未连接'}\n"
             f"本轮群数：{info['groups']}，失败：{info['failed_groups']}，积压：{info['backlog']}\n"
             f"最近扫描：{local_time(info['last_scan'])}\n"
@@ -354,6 +386,16 @@ class WeChatNoticeDigest(Star):
             f"群覆盖：{'不完整，请检查群列表或配置' if info['coverage_incomplete'] else '本地服务可见范围'}\n"
             f"{info['error']}\n首次回看 24 小时；电脑未同步的记录无法采集。"
         )
+        if self.source_mode == "builtin":
+            state = await self.collector.source.status()
+            names = {
+                "idle": "未初始化",
+                "waiting": "等待手动重启微信并登录",
+                "ready": "初始化完成",
+                "error": "不可用",
+                "cancelled": "已取消",
+            }
+            text += f"\n内置读取：{names.get(state.get('state'), '未知')}\n{state.get('error', '')}"
         if self.reporter:
             report = self.reporter.status()
             text += (

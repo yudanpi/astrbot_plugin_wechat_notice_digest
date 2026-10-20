@@ -26,18 +26,35 @@ class BuiltinNoticeSource:
         self.sequence, self.failures = 0, 0
         self.retry_at, self.backoff = 0, 0
         self.last_status = {"state": "idle", "error": ""}
+        self.configuration_error = ""
+        if os.name != "nt" or sys.maxsize < 2**32 or sys.version_info[:2] != (3, 12):
+            self.configuration_error = "内置读取需要 Windows x64 和 Python3.12"
+        elif not account or storage.name != "db_storage" or storage.parent.name != account:
+            self.configuration_error = "请在本机插件配置填写账号目录名和对应 db_storage 完整路径"
 
     async def _start(self):
+        if self.configuration_error:
+            raise ValueError(self.configuration_error)
         if self.process and self.process.returncode is None:
             return
         package = Path(__file__).resolve().parents[1]
         self.process = await asyncio.create_subprocess_exec(
-            sys.executable, "-u", "-m", package.name + ".builtin.worker",
-            cwd=package.parent, stdin=asyncio.subprocess.PIPE,
-            stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL,
-            limit=MAX_LINE, creationflags=0x08000000 if os.name == "nt" else 0,
+            sys.executable,
+            "-u",
+            "-m",
+            package.name + ".builtin.worker",
+            cwd=package.parent,
+            stdin=asyncio.subprocess.PIPE,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.DEVNULL,
+            limit=MAX_LINE,
+            creationflags=0x08000000 if os.name == "nt" else 0,
         )
-        config = {"data_dir": str(self.data_dir), "storage": str(self.storage), "account": self.account}
+        config = {
+            "data_dir": str(self.data_dir),
+            "storage": str(self.storage),
+            "account": self.account,
+        }
         self.process.stdin.write((json.dumps(config) + "\n").encode())
         await self.process.stdin.drain()
 
@@ -87,10 +104,14 @@ class BuiltinNoticeSource:
             raise RuntimeError("内置读取不可用，请检查本机初始化、登录及微信版本") from None
 
     async def initialize(self):
+        if self.configuration_error:
+            raise ValueError(self.configuration_error)
         self.retry_at = 0
         return await self._request("initialize")
 
     async def status(self):
+        if self.configuration_error:
+            return {"state": "error", "error": self.configuration_error}
         try:
             self.last_status = await self._request("status")
         except Exception:

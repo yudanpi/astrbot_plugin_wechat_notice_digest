@@ -6,7 +6,8 @@ from pathlib import Path
 from unittest.mock import patch
 
 from builtin_fixtures import RAW_KEY, encrypt, sqlite_bytes, wal
-sys.path.insert(0,str(Path(__file__).resolve().parents[2]))
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from astrbot_plugin_wechat_notice_digest.builtin.snapshot import (
     SnapshotChangedError,
     SnapshotIntegrityError,
@@ -43,7 +44,10 @@ class SnapshotTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "sample.db"
             path.write_bytes(b"a" * 4096)
-            with patch("astrbot_plugin_wechat_notice_digest.builtin.snapshot._metadata", side_effect=range(12)) as metadata:
+            with patch(
+                "astrbot_plugin_wechat_notice_digest.builtin.snapshot._metadata",
+                side_effect=range(12),
+            ) as metadata:
                 with self.assertRaises(SnapshotChangedError):
                     read_snapshot(path)
                 self.assertEqual(metadata.call_count, 12)

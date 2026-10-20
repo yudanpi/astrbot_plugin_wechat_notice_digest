@@ -24,7 +24,10 @@ class CredentialTests(unittest.TestCase):
     def test_protection_failure_never_writes_plaintext(self):
         with tempfile.TemporaryDirectory() as directory:
             store = CredentialStore(Path(directory) / "private")
-            with patch("astrbot_plugin_wechat_notice_digest.builtin.credentials._protect", side_effect=OSError("sensitive")):
+            with patch(
+                "astrbot_plugin_wechat_notice_digest.builtin.credentials._protect",
+                side_effect=OSError("sensitive"),
+            ):
                 with self.assertRaisesRegex(RuntimeError, "Credential protection failed"):
                     store.save("a", b"x" * 32)
             self.assertFalse(store.path.exists())

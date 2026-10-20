@@ -1,7 +1,7 @@
 name: astrbot_plugin_wechat_notice_digest
 display_name: 微信全体通知汇总
 desc: 从本机微信数据库自动采集各群全体通知，提供私聊要点汇总。
-version: v1.3.0
+version: v2.0.0
 author: local-user
 astrbot_version: '>=4.29.0,<5'
 support_platforms:

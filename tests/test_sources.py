@@ -17,10 +17,29 @@ class SourceTests(unittest.IsolatedAsyncioTestCase):
             source.mode = "builtin"
             source.get.side_effect = [
                 {"status": "success", "accounts": ["a"], "default_account": "a"},
-                {"status": "success", "account": "a", "source": "realtime", "sessions": [{"username":"g@chatroom","name":"群","isGroup":True}]},
-                {"status": "success", "account": "a", "source": "realtime", "messages": [{"id":"1","createTime":900,"content":"交表","senderUsername":"s","atUsernames":["notify@all"]}], "hasMore":False},
+                {
+                    "status": "success",
+                    "account": "a",
+                    "source": "realtime",
+                    "sessions": [{"username": "g@chatroom", "name": "群", "isGroup": True}],
+                },
+                {
+                    "status": "success",
+                    "account": "a",
+                    "source": "realtime",
+                    "messages": [
+                        {
+                            "id": "1",
+                            "createTime": 900,
+                            "content": "交表",
+                            "senderUsername": "s",
+                            "atUsernames": ["notify@all"],
+                        }
+                    ],
+                    "hasMore": False,
+                },
             ]
-            collector = Collector(store, source=source, clock=lambda:1000)
+            collector = Collector(store, source=source, clock=lambda: 1000)
             await collector.poll_once()
             self.assertEqual(store.count(), 1)
             self.assertEqual(collector.status()["failed_groups"], 0)
