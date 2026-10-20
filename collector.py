@@ -5,9 +5,11 @@ import json
 import sqlite3
 import time
 from pathlib import Path
-from urllib.parse import urlparse
 
-import aiohttp
+try:
+    from .sources import HttpNoticeSource
+except ImportError:
+    from sources import HttpNoticeSource
 
 
 def normalize_message(row):
@@ -236,30 +238,17 @@ class Collector:
         session_limit=2000,
         retention_days=30,
         clock=time.time,
+        source=None,
     ):
-        parsed = urlparse(base_url)
-        if parsed.scheme != "http" or parsed.hostname not in {
-            "127.0.0.1",
-            "localhost",
-            "::1",
-        }:
-            raise ValueError("数据接口必须是本机 HTTP 地址")
-        if (
-            parsed.username
-            or parsed.password
-            or parsed.query
-            or parsed.fragment
-            or parsed.path not in {"", "/"}
-        ):
-            raise ValueError("数据接口地址只能包含本机地址和端口")
-        self.store, self.base_url = store, base_url.rstrip("/")
+        self.source = source if source is not None else HttpNoticeSource(base_url)
+        self.store, self.base_url = store, getattr(self.source, "base_url", "")
         self.account = account.strip()
         self.group_ids = set(group_ids or [])
         self.page_size = max(1, min(int(page_size), 500))
         self.max_pages = max(1, min(int(max_pages), 100))
         self.session_limit = max(1, min(int(session_limit), 2000))
         self.retention_days = max(1, min(int(retention_days), 30))
-        self.clock, self.session = clock, None
+        self.clock = clock
         self.lock = asyncio.Lock()
         self.info = {
             "connected": False,
@@ -273,33 +262,7 @@ class Collector:
         }
 
     async def _get(self, path, **params):
-        if self.session is None or self.session.closed:
-            self.session = aiohttp.ClientSession(
-                timeout=aiohttp.ClientTimeout(total=20), trust_env=False
-            )
-        for attempt in range(2):
-            try:
-                async with self.session.get(
-                    self.base_url + path, params=params, allow_redirects=False
-                ) as response:
-                    if response.status != 200:
-                        raise RuntimeError(f"本地接口 HTTP {response.status}")
-                    data = await response.json()
-                if not isinstance(data, dict) or data.get("status") not in {
-                    "success",
-                    0,
-                }:
-                    raise RuntimeError("本地接口返回失败状态")
-                return data
-            except (
-                aiohttp.ClientError,
-                asyncio.TimeoutError,
-                RuntimeError,
-                ValueError,
-            ):
-                if attempt:
-                    raise
-                await asyncio.sleep(0.3)
+        return await self.source.get(path, **params)
 
     def _check_source(self, data):
         if data.get("source") != "realtime" or data.get("sourceFallback"):
@@ -440,5 +403,4 @@ class Collector:
         }
 
     async def close(self):
-        if self.session:
-            await self.session.close()
+        await self.source.close()
