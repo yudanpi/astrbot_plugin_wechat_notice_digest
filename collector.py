@@ -403,7 +403,8 @@ class Collector:
                 notices = [
                     n
                     for n in extract_notices(self.store.staged(gid), now)
-                    if n["createTime"] >= max(state["floor"], self.minimum_timestamp)
+                    if n["createTime"] >= state["floor"]
+                    and n["createTime"] > self.minimum_timestamp
                 ]
                 self.store.save_notices(gid, str(group.get("name") or gid), notices)
                 self.store.set_state(gid, {"cursor": state["started"], "active": False})

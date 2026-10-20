@@ -17,6 +17,17 @@ from astrbot_plugin_wechat_notice_digest.builtin.snapshot import (
 
 
 class SnapshotTests(unittest.TestCase):
+    def test_wal_mode_database_header_can_be_queried_in_memory(self):
+        raw = bytearray(sqlite_bytes())
+        raw[18:20] = b"\2\2"
+        plaintext = decrypt_snapshot(encrypt(raw), RAW_KEY)
+        connection = sqlite3.connect(":memory:")
+        try:
+            connection.deserialize(plaintext)
+            self.assertEqual(connection.execute("SELECT value FROM sample").fetchone(), ("hello",))
+        finally:
+            connection.close()
+
     def test_decrypts_queryable_database_and_rejects_wrong_key_or_corruption(self):
         encrypted = encrypt(sqlite_bytes())
         plaintext = decrypt_snapshot(encrypted, RAW_KEY)

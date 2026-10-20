@@ -49,7 +49,9 @@ class EndToEndTests(unittest.IsolatedAsyncioTestCase):
                 for i in range(0, len(updated), 4096)
             ]
             Path(str(message) + "-wal").write_bytes(wal(frames))
-            runtime = ReaderRuntime(root / "plugin", storage, "a")
+            runtime = ReaderRuntime(
+                root / "plugin", storage, "a", live_check=lambda force=False: True
+            )
             runtime.credentials.save("a", RAW_KEY)
 
             class Source:
@@ -108,7 +110,9 @@ class EndToEndTests(unittest.IsolatedAsyncioTestCase):
             storage.mkdir(parents=True)
             database = storage / "test.db"
             database.write_bytes(encrypt(sqlite_bytes()))
-            runtime = ReaderRuntime(root / "plugin", storage, "a")
+            runtime = ReaderRuntime(
+                root / "plugin", storage, "a", live_check=lambda force=False: True
+            )
             runtime.key = RAW_KEY
             try:
                 with patch(

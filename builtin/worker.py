@@ -10,6 +10,7 @@ from pathlib import Path
 
 from .bootstrap import BootstrapController
 from .credentials import CredentialStore
+from .liveness import LiveAccountGuard
 from .messages import LocalMessageReader, list_groups, normalize_record, read_messages
 from .snapshot import SnapshotChangedError, decrypt_snapshot, read_snapshot
 
@@ -28,7 +29,7 @@ def signature(path):
 class ReaderRuntime:
     """Use at most two in-memory database connections; never write plaintext files."""
 
-    def __init__(self, data_dir, storage, account):
+    def __init__(self, data_dir, storage, account, *, live_check=None):
         self.account, self.storage = account, Path(storage).resolve()
         self.reader = LocalMessageReader(account, self.storage)
         binding = hashlib.sha256((account + "\0" + str(self.storage)).encode()).hexdigest()[:24]
@@ -36,6 +37,7 @@ class ReaderRuntime:
         self.bootstrap = BootstrapController(self.storage, account, self.credentials)
         self.cache = OrderedDict()
         self.key = None
+        self.live_check = live_check or LiveAccountGuard(self.storage)
 
     def connection(self, path):
         before = signature(path)
@@ -71,6 +73,11 @@ class ReaderRuntime:
                 state = {"state": "ready", "error": ""}
             except RuntimeError:
                 state = {"state": "error", "error": "读取凭据不可用，请在本机重新初始化"}
+        if state["state"] == "ready" and not self.live_check():
+            return {
+                "state": "offline",
+                "error": "微信未登录所绑定账号、已退出或权限不一致；已暂停采集",
+            }
         return state
 
     def dispatch(self, method, params):
@@ -81,6 +88,8 @@ class ReaderRuntime:
             return self.bootstrap.status()
         if method != "get":
             raise ValueError("Unsupported worker method")
+        if params.get("path") == "/api/chat/accounts" and not self.live_check(force=True):
+            raise RuntimeError("Selected WeChat account is not live")
         if self.status()["state"] != "ready":
             raise RuntimeError("Reader not initialized")
         self.key = self.credentials.load(self.account)

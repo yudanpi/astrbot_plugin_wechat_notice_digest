@@ -60,26 +60,30 @@ class BuiltinNoticeSource:
 
     async def _request(self, method, **params):
         async with self.lock:
-            await self._start()
-            self.sequence += 1
-            request_id = self.sequence
-            packet = json.dumps({"id": request_id, "method": method, "params": params})
-            if len(packet.encode()) >= MAX_LINE:
-                raise RuntimeError("Reader request exceeds limit")
-            async with asyncio.timeout(30):
-                self.process.stdin.write((packet + "\n").encode())
-                await self.process.stdin.drain()
-                raw = await self.process.stdout.readline()
-                if not raw or len(raw) >= MAX_LINE:
-                    raise RuntimeError("Reader stopped or response exceeds limit")
-                response = json.loads(raw)
-                if not isinstance(response, dict) or response.get("id") != request_id:
-                    raise RuntimeError("Reader protocol mismatch")
-                if response.get("error"):
-                    raise RuntimeError(str(response["error"])[:200])
-                if not isinstance(response.get("result"), dict):
-                    raise RuntimeError("Invalid reader response")
-                return response["result"]
+            try:
+                await self._start()
+                self.sequence += 1
+                request_id = self.sequence
+                packet = json.dumps({"id": request_id, "method": method, "params": params})
+                if len(packet.encode()) >= MAX_LINE:
+                    raise RuntimeError("Reader request exceeds limit")
+                async with asyncio.timeout(30):
+                    self.process.stdin.write((packet + "\n").encode())
+                    await self.process.stdin.drain()
+                    raw = await self.process.stdout.readline()
+                    if not raw or len(raw) >= MAX_LINE:
+                        raise RuntimeError("Reader stopped or response exceeds limit")
+                    response = json.loads(raw)
+                    if not isinstance(response, dict) or response.get("id") != request_id:
+                        raise RuntimeError("Reader protocol mismatch")
+                    if response.get("error"):
+                        raise RuntimeError(str(response["error"])[:200])
+                    if not isinstance(response.get("result"), dict):
+                        raise RuntimeError("Invalid reader response")
+                    return response["result"]
+            except BaseException:
+                await asyncio.shield(self.close())
+                raise
 
     async def get(self, path, **params):
         if time.monotonic() < self.retry_at:
@@ -122,7 +126,10 @@ class BuiltinNoticeSource:
         process, self.process = self.process, None
         if process:
             if process.returncode is None:
-                process.terminate()
+                try:
+                    process.terminate()
+                except ProcessLookupError:
+                    pass
                 try:
                     await asyncio.wait_for(process.wait(), 3)
                 except asyncio.TimeoutError:

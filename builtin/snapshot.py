@@ -66,4 +66,6 @@ def decrypt_snapshot(data: bytes, raw_key: bytes) -> bytes:
             output.extend(b"SQLite format 3\0")
         output.extend(plain)
         output.extend(page[4016:])
+    # WAL has already been merged; deserialize must not look for a disk sidecar.
+    output[18:20] = b"\1\1"
     return bytes(output)

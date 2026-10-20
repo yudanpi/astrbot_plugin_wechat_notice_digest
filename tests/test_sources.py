@@ -10,6 +10,48 @@ from astrbot_plugin_wechat_notice_digest.sources import HttpNoticeSource
 
 
 class SourceTests(unittest.IsolatedAsyncioTestCase):
+    async def test_switch_second_is_excluded_to_prevent_history_resend(self):
+        with tempfile.TemporaryDirectory() as directory:
+            store = NoticeStore(Path(directory) / "n.db")
+            source = AsyncMock()
+            source.mode = "builtin"
+            source.get.side_effect = [
+                {"accounts": ["a"], "default_account": "a"},
+                {
+                    "account": "a",
+                    "source": "realtime",
+                    "sessions": [{"username": "g@chatroom", "name": "群", "isGroup": True}],
+                },
+                {
+                    "account": "a",
+                    "source": "realtime",
+                    "messages": [
+                        {
+                            "id": "new",
+                            "createTime": 1001,
+                            "content": "新",
+                            "senderUsername": "a",
+                            "atUsernames": ["notify@all"],
+                        },
+                        {
+                            "id": "old",
+                            "createTime": 1000,
+                            "content": "旧",
+                            "senderUsername": "a",
+                            "atUsernames": ["notify@all"],
+                        },
+                    ],
+                    "hasMore": False,
+                },
+            ]
+            collector = Collector(store, source=source, clock=lambda: 1100, minimum_timestamp=1000)
+            try:
+                await collector.poll_once()
+                self.assertEqual([row["id"] for row in store.query(0, 1100)], ["new"])
+            finally:
+                await collector.close()
+                store.close()
+
     async def test_injected_source_uses_existing_collector_without_http(self):
         with tempfile.TemporaryDirectory() as directory:
             store = NoticeStore(Path(directory) / "n.db")
